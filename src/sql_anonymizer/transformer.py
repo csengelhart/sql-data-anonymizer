@@ -15,8 +15,8 @@ class InsertTransformer:
         self.generator = SyntheticDataGenerator(seed)
         self.mapping_registry = MappingRegistry()
 
-    def transform_single_row(self, statement, schema_registry=None):
-        """Transform one INSERT containing one row."""
+    def transform(self, statement, schema_registry=None):
+        """Anonymize all rows in an INSERT statement."""
 
         if not isinstance(statement, exp.Insert):
             raise ValueError("The SQL statement must be an INSERT.")
@@ -26,14 +26,16 @@ class InsertTransformer:
             schema_registry,
         )
 
-        row = self._get_single_row(statement)
+        rows = self._get_rows(statement)
 
-        if len(column_names) != len(row.expressions):
-            raise ValueError(
-                "The number of columns does not match the number of values."
-            )
+        for row in rows:
+            if len(column_names) != len(row.expressions):
+                raise ValueError(
+                    "The number of columns does not match "
+                    "the number of values."
+                )
 
-        self._anonymize_row(column_names, row)
+            self._anonymize_row(column_names, row)
 
         return statement
 
@@ -67,8 +69,8 @@ class InsertTransformer:
 
         return schema_registry.get_columns(table_name)
 
-    def _get_single_row(self, statement):
-        """Return the single row from an INSERT VALUES statement."""
+    def _get_rows(self, statement):
+        """Return all rows from an INSERT VALUES statement."""
 
         values_expression = statement.expression
 
@@ -79,12 +81,12 @@ class InsertTransformer:
 
         rows = values_expression.expressions
 
-        if len(rows) != 1:
+        if not rows:
             raise ValueError(
-                "The INSERT statement must contain exactly one row."
+                "The INSERT statement must contain at least one row."
             )
 
-        return rows[0]
+        return rows
 
     def _anonymize_row(self, column_names, row):
         """Replace supported PII values in one row."""
