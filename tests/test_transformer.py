@@ -5,6 +5,7 @@ import sqlglot
 
 from sqlglot import exp
 
+from sql_anonymizer.schema import SchemaRegistry
 from sql_anonymizer.transformer import InsertTransformer
 
 
@@ -145,13 +146,73 @@ def test_null_phone_is_preserved():
 
     assert isinstance(values[2], exp.Null)
 
-
-def test_insert_without_column_list_is_rejected_for_now():
-    """Implicit columns will be added in Step 9."""
+def test_insert_without_columns_uses_table_schema():
+    """An implicit INSERT should use columns from the schema registry."""
 
     sql = """
-    INSERT INTO customers
-    VALUES (101, 'John Smith');
+    INSERT INTO shipping
+    VALUES
+        (
+            9001,
+            101,
+            'John Smith',
+            '123 Main Street, Minneapolis, MN 55401',
+            '612-555-1234',
+            'Leave package at the front desk'
+        );
+    """
+
+    statement = sqlglot.parse_one(sql, read="mysql")
+
+    schema_registry = SchemaRegistry()
+
+    schema_registry.register_table(
+        "shipping",
+        [
+            "shipping_id",
+            "customer_id",
+            "recipient_name",
+            "shipping_address",
+            "contact_phone",
+            "delivery_instructions",
+        ],
+    )
+
+    transformer = InsertTransformer(seed=499)
+
+    transformed_statement = transformer.transform_single_row(
+        statement,
+        schema_registry,
+    )
+
+    values = get_row_values(transformed_statement)
+
+    # Sensitive values should change.
+    assert values[2].this != "John Smith"
+    assert values[3].this != (
+        "123 Main Street, Minneapolis, MN 55401"
+    )
+    assert values[4].this != "612-555-1234"
+
+    # Non-sensitive values should remain unchanged.
+    assert values[0].this == "9001"
+    assert values[1].this == "101"
+    assert values[5].this == "Leave package at the front desk"
+
+def test_implicit_insert_requires_schema_registry():
+    """An implicit INSERT cannot be interpreted without its schema."""
+
+    sql = """
+    INSERT INTO shipping
+    VALUES
+        (
+            9001,
+            101,
+            'John Smith',
+            '123 Main Street',
+            '612-555-1234',
+            'Leave at front desk'
+        );
     """
 
     statement = sqlglot.parse_one(sql, read="mysql")
@@ -159,10 +220,30 @@ def test_insert_without_column_list_is_rejected_for_now():
 
     with pytest.raises(
         ValueError,
-        match="explicit column list",
+        match="schema registry is required",
     ):
         transformer.transform_single_row(statement)
 
+def test_implicit_insert_requires_known_table():
+    """An implicit INSERT should fail if its table schema is unknown."""
+
+    sql = """
+    INSERT INTO unknown_table
+    VALUES (101, 'John Smith');
+    """
+
+    statement = sqlglot.parse_one(sql, read="mysql")
+    schema_registry = SchemaRegistry()
+    transformer = InsertTransformer(seed=499)
+
+    with pytest.raises(
+        KeyError,
+        match="No schema was found for table 'unknown_table'",
+    ):
+        transformer.transform_single_row(
+            statement,
+            schema_registry,
+        )
 
 def test_multiple_rows_are_rejected_for_now():
     """Multi-row INSERT support will be added in Step 10."""

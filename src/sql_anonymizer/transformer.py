@@ -15,13 +15,17 @@ class InsertTransformer:
         self.generator = SyntheticDataGenerator(seed)
         self.mapping_registry = MappingRegistry()
 
-    def transform_single_row(self, statement):
-        """Transform one INSERT with explicit columns and one row."""
+    def transform_single_row(self, statement, schema_registry=None):
+        """Transform one INSERT containing one row."""
 
         if not isinstance(statement, exp.Insert):
             raise ValueError("The SQL statement must be an INSERT.")
 
-        column_names = self._get_explicit_columns(statement)
+        column_names = self._get_column_names(
+            statement,
+            schema_registry,
+        )
+
         row = self._get_single_row(statement)
 
         if len(column_names) != len(row.expressions):
@@ -33,22 +37,35 @@ class InsertTransformer:
 
         return statement
 
-    def _get_explicit_columns(self, statement):
-        """Return the column names declared in an INSERT statement."""
+    def _get_column_names(self, statement, schema_registry):
+        """Return explicit columns or retrieve them from the table schema."""
 
         insert_target = statement.this
 
-        if not isinstance(insert_target, exp.Schema):
+        # An exp.Schema target means the INSERT declares its columns.
+        if isinstance(insert_target, exp.Schema):
+            column_names = []
+
+            for column in insert_target.expressions:
+                column_names.append(column.name.lower())
+
+            return column_names
+
+        # Without explicit columns, the INSERT target should be a table.
+        if not isinstance(insert_target, exp.Table):
             raise ValueError(
-                "The INSERT statement must include an explicit column list."
+                "Could not determine the INSERT table."
             )
 
-        column_names = []
+        if schema_registry is None:
+            raise ValueError(
+                "A schema registry is required when an INSERT "
+                "does not declare its columns."
+            )
 
-        for column in insert_target.expressions:
-            column_names.append(column.name.lower())
+        table_name = insert_target.name
 
-        return column_names
+        return schema_registry.get_columns(table_name)
 
     def _get_single_row(self, statement):
         """Return the single row from an INSERT VALUES statement."""
