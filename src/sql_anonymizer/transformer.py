@@ -167,9 +167,16 @@ class InsertTransformer:
         row.set("expressions", row_values)
 
     def _is_string_value(self, expression):
-        """Return True when an SQL expression is a quoted string."""
+        """Return True when an expression is a non-empty SQL string."""
 
         if not isinstance(expression, exp.Literal):
             return False
 
-        return expression.is_string
+        if not expression.is_string:
+            return False
+
+        # Empty and whitespace-only values are treated as missing data.
+        if not expression.this.strip():
+            return False
+
+        return True
