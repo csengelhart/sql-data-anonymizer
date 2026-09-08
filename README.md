@@ -93,7 +93,7 @@ sql-data-anonymizer/
 ### Clone the repository
 
 ```powershell
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/csengelhart/sql-data-anonymizer
 cd sql-data-anonymizer
 ```
 
