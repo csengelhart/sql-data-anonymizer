@@ -351,4 +351,5 @@ These results demonstrate that MySQL can execute the generated file and that the
 * `NULL`, empty, and whitespace-only values remain unchanged.
 * SQL formatting may change when SQLGlot serializes the syntax tree.
 * The application does not provide a reverse-mapping function.
+* 
 
