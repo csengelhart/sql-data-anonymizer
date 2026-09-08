@@ -1,3 +1,3 @@
-Faker
-sqlglot
-pytest
+Faker==40.38.0
+sqlglot==30.18.0
+pytest==9.1.1
