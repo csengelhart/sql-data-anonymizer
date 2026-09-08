@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-data-anonymizer"
+version = "0.1.0"
+description = "Anonymize PII contained in MySQL INSERT statements."
+requires-python = ">=3.12"
+dependencies = [
+    "Faker",
+    "sqlglot",
+]
+
+[project.scripts]
+sql-anonymizer = "sql_anonymizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
